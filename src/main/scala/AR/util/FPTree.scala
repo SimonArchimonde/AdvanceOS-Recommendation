@@ -1,13 +1,11 @@
 package AR.util
 
-
 import AR.util.FPTree.Node
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/**
-  * FP-Tree data structure used in FP-Growth.
+/** FP-Tree data structure used in FP-Growth.
   *
   * //  * @tparam T item type
   */
@@ -30,12 +28,14 @@ class FPTree extends Serializable {
       //      }
       //      val summary = summaries.getOrElseUpdate(item, new Parents)
       //      summary.count += count
-      val child = curr.children.getOrElseUpdate(item, {
-        val newNode = new Node(curr)
-        newNode.item = item
-        //        summary.nodes += (newNode, count)
-        newNode
-      })
+      val child = curr.children.getOrElseUpdate(
+        item, {
+          val newNode = new Node(curr)
+          newNode.item = item
+          //        summary.nodes += (newNode, count)
+          newNode
+        }
+      )
       child.count += count
       curr = child
     }
@@ -76,10 +76,13 @@ class FPTree extends Serializable {
   //    }
   //  }
 
-  def extract(minCount: Long,
-              validateSuffix: Int => Boolean = _ => true): Iterator[(List[Int], Long)] = {
+  def extract(
+      minCount: Long,
+      validateSuffix: Int => Boolean = _ => true
+  ): Iterator[(List[Int], Long)] = {
     val reFPTree = new ReFPTree()
-    reFPTree.generateTree(root, validateSuffix)
+    reFPTree
+      .generateTree(root, validateSuffix)
       .traverse(minCount, validateSuffix)
   }
 }
@@ -103,9 +106,11 @@ class ReFPTree[T]() extends Serializable {
 
   private val summaries: mutable.Map[Int, Summary] = mutable.Map.empty
 
-  def generateTree(node: Node,
-                   validateSuffix: Int => Boolean = _ => true,
-                   parent: ReNode = new ReNode(null)): this.type = {
+  def generateTree(
+      node: Node,
+      validateSuffix: Int => Boolean = _ => true,
+      parent: ReNode = new ReNode(null)
+  ): this.type = {
     node.children.foreach { case (item, node) =>
       val curr = new ReNode(parent)
       curr.item = item
@@ -134,8 +139,12 @@ class ReFPTree[T]() extends Serializable {
     path.toList
   }
 
-  def extractOnePath(minCount: Long, suffix: List[Int],
-                     count: Long, parent: ReNode): ListBuffer[(List[Int], Long)] = {
+  def extractOnePath(
+      minCount: Long,
+      suffix: List[Int],
+      count: Long,
+      parent: ReNode
+  ): ListBuffer[(List[Int], Long)] = {
     val partFreqSet = ListBuffer.empty[(List[Int], Long)]
     val prefix = project(parent)
 
@@ -147,9 +156,12 @@ class ReFPTree[T]() extends Serializable {
     partFreqSet
   }
 
-
-  def extract(minCount: Long, suffix: List[Int], count: Long,
-              parents: mutable.Map[Int, ListBuffer[(ReNode, Long)]]): ListBuffer[(List[Int], Long)] = {
+  def extract(
+      minCount: Long,
+      suffix: List[Int],
+      count: Long,
+      parents: mutable.Map[Int, ListBuffer[(ReNode, Long)]]
+  ): ListBuffer[(List[Int], Long)] = {
 
 //    if (suffix.head == 9) {
 //      println("----------------------")
@@ -172,16 +184,21 @@ class ReFPTree[T]() extends Serializable {
     val deepNodes_parents = mutable.Map.empty[Int, ListBuffer[(ReNode, Long)]]
     parents -= deepNodeID
     deepNodes.foreach { case (node, count) =>
-
 //      if (suffix.head == 9) {
 //        println(node.item, count, node.parent.item)
 //      }
 
       nSuffix_count += count
       if (!node.parent.isRoot) {
-        val deep_nodes = deepNodes_parents.getOrElseUpdate(node.parent.item, ListBuffer.empty[(ReNode, Long)])
+        val deep_nodes = deepNodes_parents.getOrElseUpdate(
+          node.parent.item,
+          ListBuffer.empty[(ReNode, Long)]
+        )
         deep_nodes.append((node.parent, count))
-        val nodes = parents.getOrElseUpdate(node.parent.item, ListBuffer.empty[(ReNode, Long)])
+        val nodes = parents.getOrElseUpdate(
+          node.parent.item,
+          ListBuffer.empty[(ReNode, Long)]
+        )
         nodes.append((node.parent, count))
       } else {
         suffix_count -= count
@@ -204,7 +221,12 @@ class ReFPTree[T]() extends Serializable {
 //        println("2!", nSuffix, nSuffix_count)
 //      }
 
-      partFreqSet ++= extract(minCount, nSuffix, nSuffix_count, deepNodes_parents)
+      partFreqSet ++= extract(
+        minCount,
+        nSuffix,
+        nSuffix_count,
+        deepNodes_parents
+      )
     }
     //backtacking suffix without maxparent
     if (suffix_count >= minCount && suffix_count != 0) {
@@ -217,15 +239,22 @@ class ReFPTree[T]() extends Serializable {
     partFreqSet
   }
 
-  def traverse(minCount: Long,
-               validateSuffix: Int => Boolean = _ => true): Iterator[(List[Int], Long)] = {
+  def traverse(
+      minCount: Long,
+      validateSuffix: Int => Boolean = _ => true
+  ): Iterator[(List[Int], Long)] = {
     summaries.iterator.flatMap { case (item, summary) =>
       if (validateSuffix(item)) {
         val freqItemset = ListBuffer.empty[(List[Int], Long)]
         if (summary.parents.size == 1 && summary.count >= minCount) {
           val parent = summary.parents.head._1
           if (!parent.isRoot) {
-            freqItemset ++= extractOnePath(minCount, List(item), summary.count, parent)
+            freqItemset ++= extractOnePath(
+              minCount,
+              List(item),
+              summary.count,
+              parent
+            )
           }
           freqItemset.append((List(item), summary.count))
         } else if (summary.parents.size > 1 && summary.count >= minCount) {
@@ -236,7 +265,10 @@ class ReFPTree[T]() extends Serializable {
           var suffix_count = summary.count
           summary.parents.foreach { case (node, count) =>
             if (!node.isRoot) {
-              val nodes = parents.getOrElseUpdate(node.item, ListBuffer.empty[(ReNode, Long)])
+              val nodes = parents.getOrElseUpdate(
+                node.item,
+                ListBuffer.empty[(ReNode, Long)]
+              )
               nodes.append((node, count))
             } else {
               suffix_count -= count

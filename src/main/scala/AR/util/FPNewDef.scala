@@ -6,7 +6,12 @@ import java.nio.file.Path
 import FPNewDef._
 import java.{util => ju}
 
-import org.apache.spark.{HashPartitioner, Partitioner, SparkContext, SparkException}
+import org.apache.spark.{
+  HashPartitioner,
+  Partitioner,
+  SparkContext,
+  SparkException
+}
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -18,26 +23,25 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs
 import org.apache.hadoop.fs.FileSystem
 
-/**
-  * Model trained.
+/** Model trained.
   *
   * @param freqItemsets frequent itemset, which is an RDD of `FreqItemset`
   */
-class FPModel(
-               val freqItemsets: RDD[FreqItemset]) extends Serializable {
-  /**
-    * Generates association rules for [[freqItemsets]].
+class FPModel(val freqItemsets: RDD[FreqItemset]) extends Serializable {
+
+  /** Generates association rules for [[freqItemsets]].
     *
     * @param confidence minimal confidence of the rules produced
     */
-  def generateAssociationRules(confidence: Double): RDD[AssociationRules.RuleNewDef] = {
+  def generateAssociationRules(
+      confidence: Double
+  ): RDD[AssociationRules.RuleNewDef] = {
     val associationRules = new AssociationRules(confidence)
     associationRules.run(freqItemsets)
   }
 }
 
-/**
-  * A parallel FP-growth algorithm to mine frequent itemsets. The algorithm is described in
+/** A parallel FP-growth algorithm to mine frequent itemsets. The algorithm is described in
   * <a href="http://dx.doi.org/10.1145/1454008.1454027">Li et al., PFP: Parallel FP-Growth for Query
   * Recommendation</a>. PFP distributes computation in such a way that each worker executes an
   * independent group of mining tasks. The FP-Growth algorithm is described in
@@ -49,76 +53,77 @@ class FPModel(
   * @param numPartitions number of partitions used by parallel FP-growth
   * @see <a href="http://en.wikipedia.org/wiki/Association_rule_learning">
   *      Association rule learning (Wikipedia)</a>
-  *
   */
-class FPNewDef private(
-                        private var minSupport: Double,
-                        private var numPartitions: Int) extends Serializable {
+class FPNewDef private (
+    private var minSupport: Double,
+    private var numPartitions: Int
+) extends Serializable {
 
-  /**
-    * Constructs a default instance with default parameters {minSupport: `0.3`, numPartitions: same
+  /** Constructs a default instance with default parameters {minSupport: `0.3`, numPartitions: same
     * as the input data}.
-    *
     */
   def this() = this(0.3, -1)
 
-  /**
-    * Sets the minimal support level (default: `0.3`).
-    *
+  /** Sets the minimal support level (default: `0.3`).
     */
   def setMinSupport(minSupport: Double): this.type = {
-    require(minSupport >= 0.0 && minSupport <= 1.0,
-      s"Minimal support level must be in range [0, 1] but got ${minSupport}")
+    require(
+      minSupport >= 0.0 && minSupport <= 1.0,
+      s"Minimal support level must be in range [0, 1] but got ${minSupport}"
+    )
     this.minSupport = minSupport
     this
   }
 
-  /**
-    * Sets the number of partitions used by parallel FP-growth (default: same as input data).
-    *
+  /** Sets the number of partitions used by parallel FP-growth (default: same as input data).
     */
   def setNumPartitions(numPartitions: Int): this.type = {
-    require(numPartitions > 0,
-      s"Number of partitions must be positive but got ${numPartitions}")
+    require(
+      numPartitions > 0,
+      s"Number of partitions must be positive but got ${numPartitions}"
+    )
     this.numPartitions = numPartitions
     this
   }
 
-  /**
-    * Computes an FP-Growth model that contains frequent itemsets.
+  /** Computes an FP-Growth model that contains frequent itemsets.
     *
     * @param data input data set, each element contains a transaction
     * @return an FPGrowthModel
-    *
     */
   def run(data: RDD[Array[Int]]): FPModel = {
     val count = data.count()
     val minCount = math.ceil(minSupport * count).toLong
-    val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
+    val numParts =
+      if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
     val freqItems = genFreqItems(data, minCount, partitioner)
     val freqItemsets = genFreqItemsets(data, minCount, freqItems, partitioner)
     new FPModel(freqItemsets)
   }
 
-  /**
-    * Generates frequent items by filtering the input data using minimal support level.
+  /** Generates frequent items by filtering the input data using minimal support level.
     *
     * @param minCount    minimum count for frequent itemsets
     * @param partitioner partitioner used to distribute items
     * @return array of frequent pattern ordered by their frequencies
     */
   private def genFreqItems(
-                            data: RDD[Array[Int]],
-                            minCount: Long,
-                            partitioner: Partitioner): Array[Int] = {
-    data.flatMap { t =>
-      val uniq = t.toSet
-      if (t.length != uniq.size) {
-        throw new SparkException(s"Items in a transaction must be unique but got ${t.toSeq}.")
+      data: RDD[Array[Int]],
+      minCount: Long,
+      partitioner: Partitioner
+  ): Array[Int] = {
+    data
+      .flatMap { t =>
+        val uniq = t.toSet
+        if (t.length != uniq.size) {
+          throw new SparkException(
+            s"Items in a transaction must be unique but got ${t.toSeq}."
+          )
+        }
+        t
       }
-      t
-    }.map(v => (v, 1L))
+      .map(v => (v, 1L))
       .reduceByKey(partitioner, _ + _)
       .filter(_._2 >= minCount)
       .collect()
@@ -126,8 +131,7 @@ class FPNewDef private(
       .map(_._1)
   }
 
-  /**
-    * Generate frequent itemsets by building FP-Trees, the extraction is done on each partition.
+  /** Generate frequent itemsets by building FP-Trees, the extraction is done on each partition.
     *
     * @param data        transactions
     * @param minCount    minimum count for frequent itemsets
@@ -176,85 +180,96 @@ class FPNewDef private(
   //}
   //
   private def genFreqItemsets(
-                               data: RDD[Array[Int]],
-                               minCount: Long,
-                               freqItems: Array[Int],
-                               partitioner: Partitioner): RDD[FreqItemset] = {
+      data: RDD[Array[Int]],
+      minCount: Long,
+      freqItems: Array[Int],
+      partitioner: Partitioner
+  ): RDD[FreqItemset] = {
     val itemToRank = freqItems.zipWithIndex.toMap
-    val temp = data.flatMap { transaction =>
-      genCondTransactions(transaction, itemToRank, partitioner)
-    }.mapPartitions(iter => {
-      val pair = mutable.Map.empty[WrapArray, Long]
-      while (iter.hasNext) {
-        val arr = new WrapArray(iter.next())
-        val value = pair.get(arr)
-        if (value == None) {
-          pair(arr) = 1L
-        } else {
-          pair(arr) = value.get + 1L
-        }
+    val temp = data
+      .flatMap { transaction =>
+        genCondTransactions(transaction, itemToRank, partitioner)
       }
-      pair.iterator
-      //      Iterator(pair.flatMap(f => f))
-    }).map(turple => (partitioner.getPartition(turple._1.array.last), (turple._1.array, turple._2)))
-      .repartitionAndSortWithinPartitions(partitioner).mapPartitions(iter => {
-      val coArr = new ArrayBuffer[(Int, (Array[Int], Long))]()
-      var pair = mutable.Map.empty[WrapArray, Long]
-      var pre = partitioner.numPartitions + 1
-      while (iter.hasNext) {
-        val turple = iter.next()
-        if (pre > partitioner.numPartitions) {
-          pre = turple._1
-        } else if (pre != turple._1) {
-          pair.map(t => coArr.append((pre, (t._1.array, t._2))))
-          pair = mutable.Map.empty[WrapArray, Long]
-          pre = turple._1
+      .mapPartitions(iter => {
+        val pair = mutable.Map.empty[WrapArray, Long]
+        while (iter.hasNext) {
+          val arr = new WrapArray(iter.next())
+          val value = pair.get(arr)
+          if (value == None) {
+            pair(arr) = 1L
+          } else {
+            pair(arr) = value.get + 1L
+          }
         }
+        pair.iterator
+        //      Iterator(pair.flatMap(f => f))
+      })
+      .map(turple =>
+        (
+          partitioner.getPartition(turple._1.array.last),
+          (turple._1.array, turple._2)
+        )
+      )
+      .repartitionAndSortWithinPartitions(partitioner)
+      .mapPartitions(iter => {
+        val coArr = new ArrayBuffer[(Int, (Array[Int], Long))]()
+        var pair = mutable.Map.empty[WrapArray, Long]
+        var pre = partitioner.numPartitions + 1
+        while (iter.hasNext) {
+          val turple = iter.next()
+          if (pre > partitioner.numPartitions) {
+            pre = turple._1
+          } else if (pre != turple._1) {
+            pair.map(t => coArr.append((pre, (t._1.array, t._2))))
+            pair = mutable.Map.empty[WrapArray, Long]
+            pre = turple._1
+          }
 
-        val arr = new WrapArray(turple._2._1)
-        val value = pair.get(arr)
-        if (value == None) {
-          pair(arr) = turple._2._2
-        } else {
-          pair(arr) = turple._2._2 + value.get
+          val arr = new WrapArray(turple._2._1)
+          val value = pair.get(arr)
+          if (value == None) {
+            pair(arr) = turple._2._2
+          } else {
+            pair(arr) = turple._2._2 + value.get
+          }
         }
-      }
-      pair.map(t => coArr.append((pre, (t._1.array, t._2))))
-      coArr.iterator
-    }).mapPartitions { iter =>
+        pair.map(t => coArr.append((pre, (t._1.array, t._2))))
+        coArr.iterator
+      })
+      .mapPartitions { iter =>
 //      println("-------------------")
-      if (iter.hasNext) {
-        val res = new ArrayBuffer[(Int, FPTree)]()
-        var pre = iter.next()
-        var fPTree = new FPTree()
+        if (iter.hasNext) {
+          val res = new ArrayBuffer[(Int, FPTree)]()
+          var pre = iter.next()
+          var fPTree = new FPTree()
 
 //        if (pre._2._1.contains(5)) {
 //          println(pre._2._1.toList)
 //        }
 
-        fPTree.add(pre._2._1, pre._2._2)
-        while (iter.hasNext) {
-          val cur = iter.next()
-          if (cur._1 == pre._1) { //add cur to fPTree
-            fPTree.add(cur._2._1, cur._2._2)
-          } else {
-            res += ((pre._1, fPTree))
-            fPTree = new FPTree()
-            pre = cur
-            fPTree.add(pre._2._1, pre._2._2)
-          }
+          fPTree.add(pre._2._1, pre._2._2)
+          while (iter.hasNext) {
+            val cur = iter.next()
+            if (cur._1 == pre._1) { //add cur to fPTree
+              fPTree.add(cur._2._1, cur._2._2)
+            } else {
+              res += ((pre._1, fPTree))
+              fPTree = new FPTree()
+              pre = cur
+              fPTree.add(pre._2._1, pre._2._2)
+            }
 //
 //          if (cur._2._1.contains(5)) {
 //            println(cur._2._1.toList)
 //          }
 
+          }
+          res += ((pre._1, fPTree))
+          res.toArray.toIterator
+        } else {
+          Iterator()
         }
-        res += ((pre._1, fPTree))
-        res.toArray.toIterator
-      } else {
-        Iterator()
       }
-    }
     //already generate fp-tree
     temp.count()
     val gen = temp.flatMap { case (part, tree) =>
@@ -318,9 +333,7 @@ class FPNewDef private(
   //      }
   //    }
 
-
-  /**
-    * Generates conditional transactions.
+  /** Generates conditional transactions.
     *
     * @param transaction a transaction
     * @param itemToRank  map from item to their rank
@@ -349,9 +362,10 @@ class FPNewDef private(
   //}
 
   private def genCondTransactions(
-                                   transaction: Array[Int],
-                                   itemToRank: Map[Int, Int],
-                                   partitioner: Partitioner): mutable.ArrayBuffer[Array[Int]] = {
+      transaction: Array[Int],
+      itemToRank: Map[Int, Int],
+      partitioner: Partitioner
+  ): mutable.ArrayBuffer[Array[Int]] = {
     val output = mutable.ArrayBuffer.empty[Array[Int]]
     val group = mutable.Set.empty[Int]
 
@@ -407,16 +421,13 @@ class FPNewDef private(
 
 object FPNewDef {
 
-  /**
-    * Frequent itemset.
+  /** Frequent itemset.
     *
     * @param items items in this itemset. Java users should call `FreqItemset.javaItems` instead.
     * @param freq  frequency
-    *
     */
-  class FreqItemset(
-                     val items: Array[Int],
-                     val freq: Long) extends Serializable {
+  class FreqItemset(val items: Array[Int], val freq: Long)
+      extends Serializable {
 
     //    /**
     //      * Returns items in a Java List.

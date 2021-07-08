@@ -23,12 +23,17 @@ import scala.util.control.Breaks
 object FP_Growth {
 
   def total(myConf: Conf, conf: SparkConf): Unit = {
-
     val partitionNum = myConf.numPartitionAB //336
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     conf.set("spark.memory.fraction", myConf.spark_memory_fraction)
-    conf.set("spark.memory.storageFraction", myConf.spark_memory_storage_Fraction)
-    conf.set("spark.shuffle.spill.compress", myConf.spark_shuffle_spill_compress)
+    conf.set(
+      "spark.memory.storageFraction",
+      myConf.spark_memory_storage_Fraction
+    )
+    conf.set(
+      "spark.shuffle.spill.compress",
+      myConf.spark_shuffle_spill_compress
+    )
     conf.set("spark.memory.offHeap.enable", myConf.spark_memory_offHeap_enable)
     conf.set("spark.memory.offHeap.size", myConf.spark_memory_offHeap_size)
     conf.set("spark.executor.memory", myConf.spark_executor_memory_AB)
@@ -37,8 +42,7 @@ object FP_Growth {
     conf.set("spark.executor.instances", myConf.spark_executor_instances)
     conf.set("spark.cores.max", myConf.spark_cores_max_AB)
     conf.set("spark.executor.cores", myConf.spark_executor_cores_AB)
-    conf.registerKryoClasses(Array(classOf[FreqItemset],
-      classOf[RuleNewDef]))
+    conf.registerKryoClasses(Array(classOf[FreqItemset], classOf[RuleNewDef]))
     val sc = new SparkContext(conf)
 
     val data = sc.textFile(myConf.inputFilePath + "/D.dat", partitionNum)
@@ -54,29 +58,31 @@ object FP_Growth {
     sc.stop()
   }
 
-  /**
-    * Sort frequentItemSet by RDD.SortBy
+  /** Sort frequentItemSet by RDD.SortBy
     * @param outPath  save frequentItemSet file path
     * @param model generated FPGrowthModel
     * test pass...
     */
   def genFreSortBy(outPath: String, model: FPModel) = {
-    val freqUnsort = model.freqItemsets//.persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val freqSort = freqUnsort.map(itemset => s"${itemset.items.mkString(" ")}: ${itemset.freq}").sortBy(f => f)
-    println("frequentItemSet count:",freqSort.count())
+    val freqUnsort =
+      model.freqItemsets //.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val freqSort = freqUnsort
+      .map(itemset => s"${itemset.items.mkString(" ")}: ${itemset.freq}")
+      .sortBy(f => f)
+    println("frequentItemSet count:", freqSort.count())
     //save
     freqSort.saveAsTextFile(outPath)
   }
 
-
-  /**
-    * generate rules sorted and save the result
+  /** generate rules sorted and save the result
     * @param outPath   save rule as objectfile file path
     * @param model  generated FPGrowthModel
     * test pass...
     */
   def genRules(outPath: String, model: FPModel) = {
-    val assRules = model.generateAssociationRules(0.8)//.filter(rule => rule.antecedent.length < 1196)
+    val assRules = model.generateAssociationRules(
+      0.8
+    ) //.filter(rule => rule.antecedent.length < 1196)
     //    println("-------------"+assRules.count())
     //sort
 //    val assRulesSort = assRules.map(rule =>
@@ -440,7 +446,3 @@ object FP_Growth {
 //  }
 
 }
-
-
-
-
