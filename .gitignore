@@ -3,3 +3,4 @@
 .metals
 .scalafmt.conf
 start.sh
+target
