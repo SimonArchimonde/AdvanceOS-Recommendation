@@ -36,21 +36,6 @@ object RecPartUserRdd {
     }
   }
 
-  //  class MyOrdering3[T] extends Ordering[T] {
-  //    def compare(x: T, y: T): Int = {
-  //      (x, y) match {
-  //        case (null, null) => 0
-  //        case (iX: (Double, String), iY: (Double, String)) => {
-  //          if (iX._1 == iY._1) {
-  //            iY._2 compare iX._2
-  //          } else {
-  //            iX._1 compare iY._1
-  //          }
-  //        }
-  //      }
-  //    }
-  //  }
-
   def run(myConf: Conf, conf: SparkConf): Unit = {
 
     val partitionNum = myConf.numPartitionCD
@@ -87,12 +72,6 @@ object RecPartUserRdd {
 
     // broadcast rules
     val associationRules = sc.broadcast(associationRulesRdd.collect())
-
-    // read user items rdd
-    //    val userDataRdd = sc.textFile(myConf.inputFilePath + "/U.dat", 168).map(items =>
-    //      items.trim.split(' ').map(s => s.toInt).sorted
-    //    ).map(items => HashSet(items: _*)
-    //    ).zipWithIndex().repartition(168)(new MyOrdering2[(HashSet[Int], Long)])
 
     //fragmentation
     val userDataRdd = sc

@@ -16,18 +16,12 @@ object Main {
     val myConf = Conf.getConfWithoutInputAndOutput(otherArgs.toArray)
     println("args:" + myConf.toString())
 
-    val conf = new SparkConf().setAppName(myConf.appName) //.setMaster("local")
+    val conf = new SparkConf().setAppName(myConf.appName)
     myConf.inputFilePath = args(0)
     myConf.outputFilePath = args(1)
     myConf.tempFilePath = args(2)
     FP_Growth.total(myConf, conf)
     val end = System.currentTimeMillis()
     println("total time: " + (end - start) / 1000 + "s")
-
-    // val conf = new SparkConf().setAppName(myConf.appName) //.setMaster("local")
-    RecPartUserRdd.run(myConf, conf)
-    println("total time: " + (System.currentTimeMillis() - end) / 1000 + "s")
-
   }
-
 }
