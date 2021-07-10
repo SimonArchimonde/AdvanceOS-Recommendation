@@ -23,13 +23,13 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs
 import org.apache.hadoop.fs.FileSystem
 
-/** Model trained.
+/* Model trained.
   *
   * @param freqItemsets frequent itemset, which is an RDD of `FreqItemset`
   */
 class FPModel(val freqItemsets: RDD[FreqItemset]) extends Serializable {
 
-  /** Generates association rules for [[freqItemsets]].
+  /* Generates association rules for [[freqItemsets]].
     *
     * @param confidence minimal confidence of the rules produced
     */
@@ -41,7 +41,7 @@ class FPModel(val freqItemsets: RDD[FreqItemset]) extends Serializable {
   }
 }
 
-/** A parallel FP-growth algorithm to mine frequent itemsets. The algorithm is described in
+/* A parallel FP-growth algorithm to mine frequent itemsets. The algorithm is described in
   * <a href="http://dx.doi.org/10.1145/1454008.1454027">Li et al., PFP: Parallel FP-Growth for Query
   * Recommendation</a>. PFP distributes computation in such a way that each worker executes an
   * independent group of mining tasks. The FP-Growth algorithm is described in
@@ -59,12 +59,12 @@ class FPNewDef private (
     private var numPartitions: Int
 ) extends Serializable {
 
-  /** Constructs a default instance with default parameters {minSupport: `0.3`, numPartitions: same
+  /* Constructs a default instance with default parameters {minSupport: `0.3`, numPartitions: same
     * as the input data}.
     */
   def this() = this(0.3, -1)
 
-  /** Sets the minimal support level (default: `0.3`).
+  /* Sets the minimal support level (default: `0.3`).
     */
   def setMinSupport(minSupport: Double): this.type = {
     require(
@@ -75,7 +75,7 @@ class FPNewDef private (
     this
   }
 
-  /** Sets the number of partitions used by parallel FP-growth (default: same as input data).
+  /* Sets the number of partitions used by parallel FP-growth (default: same as input data).
     */
   def setNumPartitions(numPartitions: Int): this.type = {
     require(
@@ -86,7 +86,7 @@ class FPNewDef private (
     this
   }
 
-  /** Computes an FP-Growth model that contains frequent itemsets.
+  /* Computes an FP-Growth model that contains frequent itemsets.
     *
     * @param data input data set, each element contains a transaction
     * @return an FPGrowthModel
@@ -102,7 +102,7 @@ class FPNewDef private (
     new FPModel(freqItemsets)
   }
 
-  /** Generates frequent items by filtering the input data using minimal support level.
+  /* Generates frequent items by filtering the input data using minimal support level.
     *
     * @param minCount    minimum count for frequent itemsets
     * @param partitioner partitioner used to distribute items
@@ -131,7 +131,7 @@ class FPNewDef private (
       .map(_._1)
   }
 
-  /** Generate frequent itemsets by building FP-Trees, the extraction is done on each partition.
+  /* Generate frequent itemsets by building FP-Trees, the extraction is done on each partition.
     *
     * @param data        transactions
     * @param minCount    minimum count for frequent itemsets
@@ -140,45 +140,6 @@ class FPNewDef private (
     * @return an RDD of (frequent itemset, count)
     */
 
-  //  private def genFreqItemsets(
-  //                                               data: RDD[Array[String]],
-  //                                               minCount: Long,
-  //                                               freqItems: Array[String],
-  //                                               partitioner: Partitioner): RDD[FreqItemset] = {
-  //    val itemToRank = freqItems.zipWithIndex.toMap
-  //    data.flatMap { transaction =>
-  //      genCondTransactions(transaction, itemToRank, partitioner)
-  //    }.aggregateByKey(new FPTree[Int], partitioner.numPartitions)(
-  //      (tree, transaction) => tree.add(transaction, 1L),
-  //      (tree1, tree2) => tree1.merge(tree2))
-  //      .flatMap { case (part, tree) =>
-  //        tree.extract(minCount, x => partitioner.getPartition(x) == part)
-  //      }.map { case (ranks, count) =>
-  //      new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)
-  //    }
-  //  }
-
-  //private def genFreqItemsets(
-  //                                             data: RDD[Array[Item]],
-  //                                             minCount: Long,
-  //                                             freqItems: Array[Item],
-  //                                             partitioner: Partitioner): RDD[FreqItemset[Item]] = {
-  //  val itemToRank = freqItems.zipWithIndex.toMap
-  //  data.flatMap { transaction =>
-  //    genCondTransactions(transaction, itemToRank, partitioner)
-  //  }.map(itemset => (new WrapArray(itemset), 1L))
-  //    .combineByKey(x => x,(x:Long,y:Long) => x+y, (x:Long,y:Long) => x+y, partitioner, true)
-  //    .map(pair => (partitioner.getPartition(pair._1.array.last), (pair._1.array, pair._2)))
-  //    .aggregateByKey(new FPTree[Int], partitioner.numPartitions)(
-  //      (tree, transaction) => tree.add(transaction._1, transaction._2),
-  //      (tree1, tree2) => tree1.merge(tree2))
-  //    .flatMap { case (part, tree) =>
-  //      tree.extract(minCount, x => partitioner.getPartition(x) == part)
-  //    }.map { case (ranks, count) =>
-  //    new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)
-  //  }
-  //}
-  //
   private def genFreqItemsets(
       data: RDD[Array[Int]],
       minCount: Long,
@@ -202,7 +163,6 @@ class FPNewDef private (
           }
         }
         pair.iterator
-        //      Iterator(pair.flatMap(f => f))
       })
       .map(turple =>
         (
@@ -237,15 +197,10 @@ class FPNewDef private (
         coArr.iterator
       })
       .mapPartitions { iter =>
-//      println("-------------------")
         if (iter.hasNext) {
           val res = new ArrayBuffer[(Int, FPTree)]()
           var pre = iter.next()
           var fPTree = new FPTree()
-
-//        if (pre._2._1.contains(5)) {
-//          println(pre._2._1.toList)
-//        }
 
           fPTree.add(pre._2._1, pre._2._2)
           while (iter.hasNext) {
@@ -258,10 +213,6 @@ class FPNewDef private (
               pre = cur
               fPTree.add(pre._2._1, pre._2._2)
             }
-//
-//          if (cur._2._1.contains(5)) {
-//            println(cur._2._1.toList)
-//          }
 
           }
           res += ((pre._1, fPTree))
@@ -270,96 +221,17 @@ class FPNewDef private (
           Iterator()
         }
       }
-    //already generate fp-tree
+
     temp.count()
     val gen = temp.flatMap { case (part, tree) =>
       tree.extract(minCount, x => partitioner.getPartition(x) == part)
     }
-    //already generate frequentItemSet
-
-//    println("=====")
-//    println(freqItems.zipWithIndex.toMap)
-//    println("=====")
 
     gen.count()
     gen.map { case (ranks, count) =>
       new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)
     }
   }
-
-  //    private def genFreqItemsets(
-  //                                 data: RDD[Array[Int]],
-  //                                 minCount: Long,
-  //                                 freqItems: Array[Int],
-  //                                 partitioner: Partitioner): RDD[FreqItemset] = {
-  //      val itemToRank = freqItems.zipWithIndex.toMap
-  //      val temp = data.flatMap { transaction =>
-  //        genCondTransactions(transaction, itemToRank, partitioner)
-  //      }.map(itemset => (new WrapArray(itemset), 1L))
-  //        .combineByKey(x => x,(x:Long,y:Long) => x+y, (x:Long,y:Long) => x+y, partitioner, true)
-  //        .map(pair => (partitioner.getPartition(pair._1.array.last), (pair._1.array, pair._2)))
-  //        .repartitionAndSortWithinPartitions(partitioner).mapPartitions{iter=>
-  //        if(iter.hasNext){
-  //          val res = new ArrayBuffer[(Int, FPTree[Int])]()
-  //          var pre = iter.next()
-  //          var fPTree = new FPTree[Int]()
-  //          fPTree.add(pre._2._1, pre._2._2)
-  //          while(iter.hasNext){
-  //            val cur = iter.next()
-  //            if(cur._1 == pre._1){ //add cur to fPTree
-  //              fPTree.add(cur._2._1, cur._2._2)
-  //            }else{
-  //              res += ((pre._1, fPTree))
-  //              fPTree = new FPTree[Int]()
-  //              pre = cur
-  //              fPTree.add(pre._2._1, pre._2._2)
-  //            }
-  //          }
-  //          res += ((pre._1, fPTree))
-  //          res.toArray.toIterator
-  //        }else{
-  //          Iterator()
-  //        }
-  //      }
-  //      //already generate fp-tree
-  //      temp.count()
-  //      val gen = temp.flatMap { case (part, tree) =>
-  //        tree.extract(minCount, x => partitioner.getPartition(x) == part)
-  //      }
-  //      //already generate frequentItemSet
-  //      gen.count()
-  //      gen.map { case (ranks, count) =>
-  //        new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)
-  //      }
-  //    }
-
-  /** Generates conditional transactions.
-    *
-    * @param transaction a transaction
-    * @param itemToRank  map from item to their rank
-    * @param partitioner partitioner used to distribute transactions
-    * @return a map of (target partition, conditional transaction)
-    */
-  //private def genCondTransactions(
-  //                                                 transaction: Array[String],
-  //                                                 itemToRank: Map[String, Int],
-  //                                                 partitioner: Partitioner): mutable.Map[Int, Array[Int]] = {
-  //  val output = mutable.Map.empty[Int, Array[Int]]
-  //  // Filter the basket by frequent items pattern and sort their ranks.
-  //  val filtered = transaction.flatMap(itemToRank.get)
-  //  ju.Arrays.sort(filtered)
-  //  val n = filtered.length
-  //  var i = n - 1
-  //  while (i >= 0) {
-  //    val item = filtered(i)
-  //    val part = partitioner.getPartition(item)
-  //    if (!output.contains(part)) {
-  //      output(part) = filtered.slice(0, i + 1)
-  //    }
-  //    i -= 1
-  //  }
-  //  output
-  //}
 
   private def genCondTransactions(
       transaction: Array[Int],
@@ -380,48 +252,17 @@ class FPNewDef private (
       if (!group.contains(part)) {
         output.append(filtered.slice(0, i + 1))
         group.add(part)
-
-//        val a = filtered.slice(0, i + 1).toList
-//        if (a.contains(5)) {
-//          println(a)
-//        }
-
       }
       i -= 1
     }
     output
   }
 
-  //
-  //private def genCondTransactions(
-  //                                 transaction: Array[String],
-  //                                 itemToRank: Map[String, Int],
-  //                                 partitioner: Partitioner): mutable.ArrayBuffer[List[Int]] = {
-  //  val output = mutable.ArrayBuffer.empty[List[Int]]
-  //  val group = mutable.Set.empty[Int]
-  //
-  //  // Filter the basket by frequent items pattern and sort their ranks.
-  //  val filtered = transaction.flatMap(itemToRank.get)
-  //  ju.Arrays.sort(filtered)
-  //  val n = filtered.length
-  //  var i = n - 1
-  //  while (i >= 0) {
-  //    val item = filtered(i)
-  //    val part = partitioner.getPartition(item)
-  //    if (!group.contains(part)) {
-  //      output.append(filtered.slice(0, i + 1).toList)
-  //      group.add(part)
-  //    }
-  //    i -= 1
-  //  }
-  //  output
-  //}
-
 }
 
 object FPNewDef {
 
-  /** Frequent itemset.
+  /* Frequent itemset.
     *
     * @param items items in this itemset. Java users should call `FreqItemset.javaItems` instead.
     * @param freq  frequency
@@ -429,35 +270,10 @@ object FPNewDef {
   class FreqItemset(val items: Array[Int], val freq: Long)
       extends Serializable {
 
-    //    /**
-    //      * Returns items in a Java List.
-    //      *
-    //      */
-    //    def javaItems: java.util.List[Item] = {
-    //      items.toList.asJava
-    //    }
-
     override def toString: String = {
       s"${items.mkString("{", ",", "}")}: $freq"
     }
   }
 
   class WrapArray(val array: Array[Int])
-
-  //    extends  Serializable {
-  //    override def hashCode(): Int = Arrays.hashCode(this.array)
-  //
-  //    def canEqual(a: Any) = a.isInstanceOf[WrapArray]
-  //
-  //    override def equals(obj: scala.Any): Boolean = {
-  //      obj match {
-  //        case obj: WrapArray => obj.canEqual() && Arrays.equals(obj.array, this.array)
-  //        case _ => false
-  //      }
-  //    }
-  //
-  //    override def toString: String = super.toString
-  //  }
-  //
-
 }

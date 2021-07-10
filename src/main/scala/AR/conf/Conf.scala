@@ -1,6 +1,6 @@
 package AR.conf
 
-/** System config
+/* System config
   * example:
   */
 case class Conf() {

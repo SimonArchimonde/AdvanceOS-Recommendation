@@ -4,16 +4,16 @@ import AssociationRules.RuleNewDef
 import FPNewDef.FreqItemset
 import org.apache.spark.rdd.RDD
 
-/** Generates association rules from a `RDD[FreqItemset[Item]]`. This method only generates
+/* Generates association rules from a `RDD[FreqItemset[Item]]`. This method only generates
   * association rules which have a single item as the consequent.
   */
 class AssociationRules(private var minConfidence: Double) extends Serializable {
 
-  /** Constructs a default instance with default parameters {minConfidence = 0.8}.
+  /* Constructs a default instance with default parameters {minConfidence = 0.8}.
     */
   def this() = this(0.8)
 
-  /** Sets the minimal confidence (default: `0.8`).
+  /* Sets the minimal confidence (default: `0.8`).
     */
   def setMinConfidence(minConfidence: Double): this.type = {
     require(
@@ -24,7 +24,7 @@ class AssociationRules(private var minConfidence: Double) extends Serializable {
     this
   }
 
-  /** Computes the association rules with confidence above [[minConfidence]].
+  /* Computes the association rules with confidence above [[minConfidence]].
     * @param freqItemsets frequent itemset model obtained from FPGrowth
     * @return a `Set[Rule[Item]]` containing the association rules.
     */
@@ -46,8 +46,6 @@ class AssociationRules(private var minConfidence: Double) extends Serializable {
       .join(freqItemsets.map(x => (x.items.toSeq, x.freq)))
       .filter(f => f._2._1._2.toDouble / f._2._2.toDouble >= minConfidence)
       .map { case (antecendent, ((consequent, freqUnion), freqAntecedent)) =>
-//                new Rule(antecendent.toArray, consequent.toArray, freqUnion, freqAntecedent)
-//              }.filter(_.confidence >= minConfidence)
         new RuleNewDef(
           antecendent.toArray.sorted,
           consequent.toArray,
@@ -56,48 +54,11 @@ class AssociationRules(private var minConfidence: Double) extends Serializable {
       }
   }
 
-//  /** Java-friendly version of [[run]]. */
-//  def run[Item](freqItemsets: JavaRDD[FreqItemset[Item]]): JavaRDD[Rule[Item]] = {
-//    val tag = fakeClassTag[Item]
-//    run(freqItemsets.rdd)(tag)
-//  }
 }
 
 object AssociationRules {
 
-//  /**
-//    * An association rule between sets of items.
-//    * @param antecedent hypotheses of the rule. Java users should call [[Rule#javaAntecedent]]
-//    *                   instead.
-//    * @param consequent conclusion of the rule. Java users should call [[Rule#javaConsequent]]
-//    *                   instead.
-//    *
-//    */
-//  class Rule(
-//                    val antecedent: Array[String],
-//                    val consequent: Array[String],
-//                    freqUnion: Double,
-//                    freqAntecedent: Double) extends Serializable {
-//
-//    /**
-//      * Returns the confidence of the rule.
-//      *
-//      */
-//    def confidence: Double = freqUnion.toDouble / freqAntecedent
-//
-//    require(antecedent.toSet.intersect(consequent.toSet).isEmpty, {
-//      val sharedItems = antecedent.toSet.intersect(consequent.toSet)
-//      s"A valid association rule must have disjoint antecedent and " +
-//        s"consequent but ${sharedItems} is present in both."
-//    })
-//
-//    override def toString: String = {
-//      s"${antecedent.mkString("{", ",", "}")} => " +
-//        s"${consequent.mkString("{", ",", "}")}: ${confidence}"
-//    }
-//  }
-
-  /** Like fpm.AssociatedRules.Rule
+  /* Like fpm.AssociatedRules.Rule
     * @param antecedent
     * @param consequent
     * @param confidence
@@ -122,15 +83,4 @@ object AssociationRules {
     }
   }
 
-//  /**
-//    * For pair(consequent,confidence) in RuleNewDef
-//    * @param consequent  String instead of Array[Item]
-//    * @param confidence
-//    */
-//  class ConSeq(
-//                val consequent: Int,
-//                val confidence: Double
-//              ) extends Serializable {
-//
-//  }
 }

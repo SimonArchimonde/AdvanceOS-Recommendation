@@ -128,6 +128,8 @@ openjdk 1.8.0_292
 
 #### 4.2.详细的算法设计与实现 
 
+
+
 #### 4.3.实验结果与分析
 
 ##### 4.3.1.正确性
@@ -146,17 +148,87 @@ mvn clean install
 
 ##### 4.4.2.运行命令
 
-　　运行脚本如下所示，由于赛题中只给出了一个输入路径参数和一个输出路径参数，因此代码中读取输入路径为`input+'/D.dat'`和`input+'/U.dat'`，所以在输入路径文件夹中需要包含D.dat和U.dat文件。代码中输出路径为`output+'/Frep'`和`output+'/Rec'`。临时工作目录用于存储关联规则。（若如下脚本不能运行，请将参数配置部分的"."改为“-”，如“executor-memory”改为“executor.memory”）
+　　运行脚本如下所示，由于赛题中只给出了一个输入路径参数和一个输出路径参数，因此代码中读取输入路径为`input+'/D.dat'`和`input+'/U.dat'`，所以在输入路径文件夹中需要包含D.dat和U.dat文件。代码中输出路径为`output+'/Frep'`和`output+'/Rec'`。临时工作目录用于存储关联规则。
 
 ```shell
 ${SPARK_HOME/bin}/spark-submit \
 --master <test spark cluster master uri> \
---class AR.Main\
+--class AR.Main \
 --executor-memory 20G \
 --driver-memory 20G \
 <your jar file path> \
 hdfs://<输入文件夹路径> \
 hdfs://<结果输出文件(夹)路径> \
 hdfs://<临时工作目录路径>
+```
+
+##### 4.4.3.代码逻辑
+
+主函数对象：处理对应输入参数，然后通过FP_Growth算法计算频繁模式。
+
+```scala
+object Main {
+  def main(args: Array[String]): Unit = {
+    val start = System.currentTimeMillis()
+    assert(
+      args.length >= 2,
+      "Usage: JavaFPGrowthExample <input-file> <output-file> <tmp-file> <spark.cores.max (optional)> <spark.executor.cores (optional)>"
+    )
+    val otherArgs = for (i <- 0 until args.length if i >= 2) yield args(i)
+    val myConf = Conf.getConfWithoutInputAndOutput(otherArgs.toArray)
+    println("args:" + myConf.toString())
+
+    val conf = new SparkConf().setAppName(myConf.appName)
+    myConf.inputFilePath = args(0)
+    myConf.outputFilePath = args(1)
+    myConf.tempFilePath = args(2)
+    FP_Growth.total(myConf, conf)
+    val end = System.currentTimeMillis()
+    println("total time: " + (end - start) / 1000 + "s")
+  }
+}
+```
+
+FP_Growth对象：设置参数后，实例化实际的FPNewDef()。
+
+```scala
+object FP_Growth {
+
+  def total(myConf: Conf, conf: SparkConf): Unit = {
+    val partitionNum = myConf.numPartitionAB //336
+    ...
+    val sc = new SparkContext(conf)
+    val data = sc.textFile(myConf.inputFilePath + "/D.dat", partitionNum)
+    val transactions = data.map(s => s.trim.split(' ').map(f => f.toInt))
+    val fp = new FPNewDef() //FPGrowth()
+      .setMinSupport(0.092) // 0.092
+      .setNumPartitions(partitionNum)
+    val fpgrowth = fp.run(transactions)
+    fpgrowth.freqItemsets.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    genFreSortBy(myConf.outputFilePath + "/Freq", fpgrowth)
+    sc.stop()
+  }
+}
+```
+
+FPNewDef类：一种用于挖掘频繁项集的并行 FP-growth 算法。
+
+```scala
+class FPNewDef private (
+    private var minSupport: Double,
+    private var numPartitions: Int
+) extends Serializable {  
+    ...
+    def run(data: RDD[Array[Int]]): FPModel = {
+        val count = data.count()
+        val minCount = math.ceil(minSupport * count).toLong
+        val numParts =
+          if (numPartitions > 0) numPartitions else data.partitions.length
+        val partitioner = new HashPartitioner(numParts)
+        val freqItems = genFreqItems(data, minCount, partitioner)
+        val freqItemsets = genFreqItemsets(data, minCount, freqItems, partitioner)
+        new FPModel(freqItemsets)
+    }
+}
 ```
 

@@ -5,7 +5,7 @@ import AR.util.FPTree.Node
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/** FP-Tree data structure used in FP-Growth.
+/* FP-Tree data structure used in FP-Growth.
   *
   * //  * @tparam T item type
   */
@@ -17,22 +17,16 @@ class FPTree extends Serializable {
 
   //  private val summaries: mutable.Map[T, Parents[T]] = mutable.Map.empty
 
-  /** Adds a transaction with count. */
+  /* Adds a transaction with count. */
   def add(t: Iterable[Int], count: Long = 1L): this.type = {
     require(count > 0)
     var curr = root
     curr.count += count
     t.foreach { item =>
-      //      if (item == 5) {
-      //        println(curr.item)
-      //      }
-      //      val summary = summaries.getOrElseUpdate(item, new Parents)
-      //      summary.count += count
       val child = curr.children.getOrElseUpdate(
         item, {
           val newNode = new Node(curr)
           newNode.item = item
-          //        summary.nodes += (newNode, count)
           newNode
         }
       )
@@ -41,40 +35,6 @@ class FPTree extends Serializable {
     }
     this
   }
-
-  //  /** Gets a subtree with the suffix后缀. */
-  //  private def project(suffix: T): FPTree[T] = {
-  //    val tree = new FPTree[T]
-  //    if (summaries.contains(suffix)) {
-  //      val summary = summaries(suffix)
-  //      summary.nodes.foreach { node =>
-  //        var t = List.empty[T]
-  //        var curr = node.parent
-  //        while (!curr.isRoot) {
-  //          t = curr.item :: t
-  //          curr = curr.parent
-  //        }
-  //        tree.add(t, node.count)
-  //      }
-  //    }
-  //    tree
-  //  }
-
-  //  /** Extracts all patterns with valid suffix and minimum count. */
-  //  def extract(
-  //               minCount: Long,
-  //               validateSuffix: T => Boolean = _ => true): Iterator[(List[T], Long)] = {
-  //    summaries.iterator.flatMap { case (item, summary) =>
-  //      if (validateSuffix(item) && summary.count >= minCount) {
-  //        Iterator.single((item :: Nil, summary.count)) ++
-  //          project(item).extract(minCount).map { case (t, c) =>
-  //            (item :: t, c)
-  //          }
-  //      } else {
-  //        Iterator.empty
-  //      }
-  //    }
-  //  }
 
   def extract(
       minCount: Long,
@@ -89,7 +49,7 @@ class FPTree extends Serializable {
 
 object FPTree {
 
-  /** Representing a node in an FP-Tree. */
+  /* Representing a node in an FP-Tree. */
   class Node(val parent: Node) extends Serializable {
     var item: Int = _
     var count: Long = 0L
@@ -114,11 +74,6 @@ class ReFPTree[T]() extends Serializable {
     node.children.foreach { case (item, node) =>
       val curr = new ReNode(parent)
       curr.item = item
-
-      //      if (item == 5 && validateSuffix(10)) {
-      //        println("-",5, parent.item, node.count)
-      //      }
-
       if (validateSuffix(item)) {
         val summary = summaries.getOrElseUpdate(item, new Summary)
         summary.parents.append((parent, node.count))
@@ -163,31 +118,16 @@ class ReFPTree[T]() extends Serializable {
       parents: mutable.Map[Int, ListBuffer[(ReNode, Long)]]
   ): ListBuffer[(List[Int], Long)] = {
 
-//    if (suffix.head == 9) {
-//      println("----------------------")
-//    }
-
     val partFreqSet = ListBuffer.empty[(List[Int], Long)]
     val deepNodeID = parents.keys.max
     val deepNodes = parents(deepNodeID)
-    //backtracking then get only one path
-    //    if (parents.keys.size == 1 && count >= minCount) {
-    //      partFreqSet ++= extractOnePath(minCount, suffix, count, deepNodes.head._1)
-    //      return partFreqSet
-    //    }
-    //over one path
     val nSuffix = suffix :+ deepNodeID
-    //    var nSuffix_count = deepNodes.map(_._2).sum
     var nSuffix_count = 0L
     var countRoot = 0L
     var suffix_count = count
     val deepNodes_parents = mutable.Map.empty[Int, ListBuffer[(ReNode, Long)]]
     parents -= deepNodeID
     deepNodes.foreach { case (node, count) =>
-//      if (suffix.head == 9) {
-//        println(node.item, count, node.parent.item)
-//      }
-
       nSuffix_count += count
       if (!node.parent.isRoot) {
         val deep_nodes = deepNodes_parents.getOrElseUpdate(
@@ -206,21 +146,11 @@ class ReFPTree[T]() extends Serializable {
       }
     }
     if (nSuffix_count >= minCount) {
-//
-//      if (suffix.head == 9) {
-//        println("1!", nSuffix, nSuffix_count)
-//      }
-
       partFreqSet.append((nSuffix, nSuffix_count))
     }
     //backtraking suffix+maxparent
     nSuffix_count -= countRoot
     if (nSuffix_count >= minCount && nSuffix_count != 0) {
-
-//      if (suffix.head == 9) {
-//        println("2!", nSuffix, nSuffix_count)
-//      }
-
       partFreqSet ++= extract(
         minCount,
         nSuffix,
@@ -230,10 +160,6 @@ class ReFPTree[T]() extends Serializable {
     }
     //backtacking suffix without maxparent
     if (suffix_count >= minCount && suffix_count != 0) {
-
-//      if (suffix.head == 9) {
-//        println("3!", suffix, suffix_count)
-//      }
       partFreqSet ++= extract(minCount, suffix, suffix_count, parents)
     }
     partFreqSet
@@ -295,7 +221,7 @@ object ReFPTree {
     def isRoot: Boolean = parent == null
   }
 
-  /** Parents of an item in an FP-Tree. */
+  /* Parents of an item in an FP-Tree. */
   private class Summary extends Serializable {
     var count: Long = 0L
     val parents: ListBuffer[(ReNode, Long)] = ListBuffer.empty

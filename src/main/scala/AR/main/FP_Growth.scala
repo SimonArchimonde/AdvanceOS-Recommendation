@@ -48,17 +48,16 @@ object FP_Growth {
     val data = sc.textFile(myConf.inputFilePath + "/D.dat", partitionNum)
     val transactions = data.map(s => s.trim.split(' ').map(f => f.toInt))
 
-    val fp = new FPNewDef() //FPGrowth(）
+    val fp = new FPNewDef() //FPGrowth()
       .setMinSupport(0.092) // 0.092
       .setNumPartitions(partitionNum)
     val fpgrowth = fp.run(transactions)
     fpgrowth.freqItemsets.persist(StorageLevel.MEMORY_AND_DISK_SER)
     genFreSortBy(myConf.outputFilePath + "/Freq", fpgrowth)
-    genRules(myConf.tempFilePath, fpgrowth)
     sc.stop()
   }
 
-  /** Sort frequentItemSet by RDD.SortBy
+  /* Sort frequentItemSet by RDD.SortBy
     * @param outPath  save frequentItemSet file path
     * @param model generated FPGrowthModel
     * test pass...
@@ -74,7 +73,7 @@ object FP_Growth {
     freqSort.saveAsTextFile(outPath)
   }
 
-  /** generate rules sorted and save the result
+  /* generate rules sorted and save the result
     * @param outPath   save rule as objectfile file path
     * @param model  generated FPGrowthModel
     * test pass...
@@ -82,11 +81,7 @@ object FP_Growth {
   def genRules(outPath: String, model: FPModel) = {
     val assRules = model.generateAssociationRules(
       0.8
-    ) //.filter(rule => rule.antecedent.length < 1196)
-    //    println("-------------"+assRules.count())
-    //sort
-//    val assRulesSort = assRules.map(rule =>
-//      new RuleNewDef(rule.antecedent.sorted, rule.consequent, rule.confidence))
+    )
     println("Associated Rules count", assRules.count())
     //save
     assRules.saveAsObjectFile(outPath)
