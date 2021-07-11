@@ -17,8 +17,6 @@ openjdk 1.8.0_292
 ​	本项目用scala语言编写，用maven组织。代码结构如下。
 - 项目src/main/AR目录下存放源代码文件。
 - main文件夹中存放频繁项集挖掘与关联规则生成与关联规则匹配与推荐分值计算这两个模块的代码。
-- util包里FPTree、AssociationRules是频繁项集挖掘所必须的数据结构，FPNewDef是基于mllib的FP-Growth算法的优化版本。
-- conf文件夹包含一个Conf类用于程序运行参数配置。
 
 ~~~shell
 |____src
@@ -27,15 +25,6 @@ openjdk 1.8.0_292
 | | |____scala
 | | | |____AR
 | | | | |____Main.scala                 # main函数
-| | | | |____main
-| | | | | |____FPGrowth.scala           # 频繁项集挖掘与关联规则生成
-| | | | | |____RecPartUserRdd.scala     # 关联规则匹配与推荐分值计算
-| | | | |____conf
-| | | | | |____Conf.scala                  # 配置参数类
-| | | | |____util
-| | | | | |____AssociationRules.scala     # 关联规则实体类 
-| | | | | |____FPTree.scala          
-| | | | | |____FPNewDef.scala             # PFP基于spark源码优化算法
 ~~~
 
 ### 4.实验说明
@@ -127,6 +116,92 @@ openjdk 1.8.0_292
 
 
 #### 4.2.详细的算法设计与实现 
+
+#####4.2.2 PFP-Growth
+
+​		FP-Growth代码部分如下图所示，首先设置算法所需的参数，支持度和置信度的含义如上面算法所述。数据分区为spark分区参数，决定了运行时的并行度，分区过少可能会导致内存不足。
+
+​		实验使用spark.mllib中的pfp-growth算法，实例化算法后，使用run函数对数据执行FP-Growth算法，即可产生频繁项集，此处为了使后续使用频繁项集数据时可以直接从内存中读取，使用了persist持久化函数。使用saveAsTextFile将频繁项集保存在输出目录的/Freq路径下。
+
+​		获取频繁项集后，通过置信度筛选出关联规则，并存储在输出目录的/Rules路径下。
+
+```scala
+// 最小支持度
+val minSupport=0.092
+// 最小置信度
+val minConfidence=0.8
+// 数据分区
+val numPartitions=336
+
+// 创建一个FPGrowth的算法实例
+val fpg = new FPGrowth()
+
+// 设置训练时候的最小支持度和数据分区
+fpg.setMinSupport(minSupport)
+fpg.setNumPartitions(numPartitions)
+
+// 数据送入算法
+val model = fpg.run(purchase)
+
+// 保存所有的频繁项集
+model.freqItemsets.persist(StorageLevel.MEMORY_AND_DISK_SER)
+model.freqItemsets.saveAsTextFile(output_path + "/Freq")
+
+// 将频繁项集转为列表，后续推荐过程使用
+val freqItems = model.freqItemsets.collect()
+
+// 通过置信度筛选出推荐规则并保存
+model.generateAssociationRules(minConfidence).saveAsTextFile(output_path + "/Rules")
+```
+
+
+
+##### 4.2.3 推荐结果生成
+
+​		代码中由U.dat数据得到用户概貌列表，此处需要以前文获取的关联规则为基础，计算用户推荐结果。首先对每个用户，在频繁项集中统计包含其购买商品（概貌）的频度；此后对频繁项集中的每个集合，若其包含该用户概貌，则计算其推荐分值。最后选择推荐分值最大的结果作为推荐商品，将推荐结果存储到输出目录的/Rec路径下。
+
+```scala
+// 根据用户数据推荐商品
+val userList = users.collect()
+val recList = ListBuffer[String]()
+for(user <- userList){
+    // 对每个用户，获取包含其购买的产品项集的频度
+    var goodFreq = 0L
+    for(goods <- freqItems){
+        if(goods.items.mkString == user.mkString){
+            goodFreq = goods.freq
+        }
+    }
+    var preConf = 0D
+    // 推荐结果初始化为 0
+    var rec = "0"
+    // 对频繁项集中的每个集合计算推荐分值
+    for(f <- freqItems){
+        // 若项集包含用户购买的商品，则推荐结果从其中产生
+        if(f.items.mkString.contains(user.mkString) && f.items.size > user.size){
+            // 计算推荐分值
+            var conf:Double = f.freq.toDouble / goodFreq.toDouble
+            // 若推荐分值大于此前的最大推荐分值，则更新最大推荐分值和推荐结果
+            if(conf >= preConf) {
+                preConf = conf
+                var item = f.items
+                // 过滤用户已购买过的商品
+                for(i <- 0 until user.size){
+                    item = item.filter(_ != user(i)) 
+                }
+                // 将推荐商品列表转化为字符串
+                rec = item.mkString(" ")
+            }
+        }
+    }
+    // 将推荐结果存入列表中
+    recList += rec
+}
+// 将列表转化为RDD对象并保存至文件
+sc.parallelize(recList).saveAsTextFile(output_path + "/Rec")
+```
+
+
 
 
 
