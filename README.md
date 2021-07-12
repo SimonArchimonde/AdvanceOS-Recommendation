@@ -6,11 +6,15 @@ SA20221053 李林枫
 
 SA20221901 朱池苇
 
+
+
 ### 2.项目环境
 
 spark-3.1.2-bin-hadoop3.2
 
 openjdk 1.8.0_292
+
+
 
 ### 3.项目结构
 
@@ -27,11 +31,13 @@ openjdk 1.8.0_292
 | | | | |____Main.scala                 # main函数
 ~~~
 
+
+
 ### 4.实验说明
 
 #### 4.1.并行化设计思路和方法 
 
-##### 4.3.1 问题定义
+##### 4.1.1.问题定义
 
 ​		关联规则是形如$X\rightarrow Y$的蕴含表达式，其中X和Y为不相交的项集，关联规则的强度可以用其支持度和置信度来度量，支持度确定规则可以用于给定数据集的频繁程度，而置信度确定Y在包含X的事务中出现的频繁程度。
 
@@ -47,7 +53,7 @@ openjdk 1.8.0_292
 
 
 
-##### 4.3.2 FP-Growth算法
+##### 4.1.2.FP-Growth算法
 
 ​		频繁项集产生最原始的方法为枚举求解，使用格结构枚举所有可能的项集（如下图所示），一个包含k个项的数据集可能产生$2^k-1$个频繁项集。将每个候选项集与每个事务进行比较，如果候选项集包含在事务中，则候选项集的支持度计数增加。这种方法的开销非常大，需进行$O(NMw)$次比较，其中$N$为事务数，$M$为候选项集数，$w$为事务的最大宽度。
 
@@ -97,7 +103,7 @@ openjdk 1.8.0_292
 
 
 
-##### 4.3.3 PFP-Growth
+##### 4.1.3.PFP-Growth
 
 ​		PFP-Growth全称为Parallel FP-Growth，即并行FP-Growth算法，目前多数分布式开发库中的FP-Growth算法均基于这一算法实现，包括本实验采用的Spark。
 
@@ -117,7 +123,7 @@ openjdk 1.8.0_292
 
 #### 4.2.详细的算法设计与实现 
 
-#####4.2.2 PFP-Growth
+##### 4.2.1.PFP-Growth
 
 ​		FP-Growth代码部分如下图所示，首先设置算法所需的参数，支持度和置信度的含义如上面算法所述。数据分区为spark分区参数，决定了运行时的并行度，分区过少可能会导致内存不足。
 
@@ -156,7 +162,7 @@ model.generateAssociationRules(minConfidence).saveAsTextFile(output_path + "/Rul
 
 
 
-##### 4.2.3 推荐结果生成
+##### 4.2.2.推荐结果生成
 
 ​		代码中由U.dat数据得到用户概貌列表，此处需要以前文获取的关联规则为基础，计算用户推荐结果。首先对每个用户，在频繁项集中统计包含其购买商品（概貌）的频度；此后对频繁项集中的每个集合，若其包含该用户概貌，则计算其推荐分值。最后选择推荐分值最大的结果作为推荐商品，将推荐结果存储到输出目录的/Rec路径下。
 
@@ -233,6 +239,8 @@ sc.parallelize(recList).saveAsTextFile(output_path + "/Rec")
 mvn clean install
 ```
 
+
+
 ##### 4.4.2.运行命令
 
 　　运行脚本如下所示，由于赛题中只给出了一个输入路径参数和一个输出路径参数，因此代码中读取输入路径为`input+'/D.dat'`和`input+'/U.dat'`，所以在输入路径文件夹中需要包含D.dat和U.dat文件。代码中输出路径为`output+'/Frep'`和`output+'/Rec'`。临时工作目录用于存储关联规则。
@@ -249,73 +257,82 @@ hdfs://<结果输出文件(夹)路径> \
 hdfs://<临时工作目录路径>
 ```
 
+
+
 ##### 4.4.3.代码逻辑
 
-主函数对象：处理对应输入参数，然后通过PFP_Growth算法计算频繁模式。
+参数设置部分：
 
 ```scala
-object Main {
-  def main(args: Array[String]): Unit = {
-    val start = System.currentTimeMillis()
-    assert(
-      args.length >= 2,
-      "Usage: JavaFPGrowthExample <input-file> <output-file> <tmp-file> <spark.cores.max (optional)> <spark.executor.cores (optional)>"
-    )
-    val otherArgs = for (i <- 0 until args.length if i >= 2) yield args(i)
-    val myConf = Conf.getConfWithoutInputAndOutput(otherArgs.toArray)
-    println("args:" + myConf.toString())
+// 设置默认spark参数
+var spark_memory_fraction = "0.7"
+var spark_memory_storage_Fraction = "0.3"
+var spark_shuffle_spill_compress = "true"
+var spark_memory_offHeap_enable = "true"
+var spark_memory_offHeap_size = "5g"
 
-    val conf = new SparkConf().setAppName(myConf.appName)
-    myConf.inputFilePath = args(0)
-    myConf.outputFilePath = args(1)
-    myConf.tempFilePath = args(2)
-    FP_Growth.total(myConf, conf)
-    val end = System.currentTimeMillis()
-    println("total time: " + (end - start) / 1000 + "s")
-  }
-}
+var spark_executor_cores_AB = "2"
+var spark_cores_max_AB = "42"
+
+var spark_executor_cores_CD = "8"
+var spark_cores_max_CD = "168"
+var spark_parallelism_CD = "672"
+
+var spark_executor_instances = "21"
+var spark_driver_cores = "24"
+var spark_driver_memory = "20g"
+var spark_executor_memory_AB = "20g"
+var spark_executor_memory_CD = "20g"
+
+// 实例化conf对象
+val conf = new SparkConf().setAppName("FPGrowth")
+conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+conf.set("spark.memory.fraction", spark_memory_fraction)
+conf.set("spark.memory.storageFraction", spark_memory_storage_Fraction)
+conf.set("spark.shuffle.spill.compress", spark_shuffle_spill_compress)
+conf.set("spark.memory.offHeap.enable", spark_memory_offHeap_enable)
+conf.set("spark.memory.offHeap.size", spark_memory_offHeap_size)
+conf.set("spark.executor.memory", spark_executor_memory_AB)
+conf.set("spark.driver.cores", spark_driver_cores)
+conf.set("spark.driver.memory", spark_driver_memory)
+conf.set("spark.executor.instances", spark_executor_instances)
+conf.set("spark.cores.max", spark_cores_max_AB)
+conf.set("spark.executor.cores", spark_executor_cores_AB)
+
+// 将参数传入sparkcontext
+val sc = new SparkContext(conf)
+
+// 命令行参数
+val input_path=args(0)
+val output_path=args(1)
+val tmp_path = args(2)
+
+// 最小支持度
+val minSupport=0.092
+// 最小置信度
+val minConfidence=0.8
+// 数据分区
+val numPartitions=336
+...
 ```
 
-FP_Growth对象：设置参数后，实例化实际的FPNewDef()。
+数据读取部分：
 
 ```scala
-object FP_Growth {
-
-  def total(myConf: Conf, conf: SparkConf): Unit = {
-    val partitionNum = myConf.numPartitionAB //336
-    ...
-    val sc = new SparkContext(conf)
-    val data = sc.textFile(myConf.inputFilePath + "/D.dat", partitionNum)
-    val transactions = data.map(s => s.trim.split(' ').map(f => f.toInt))
-    val fp = new FPNewDef() //FPGrowth()
-      .setMinSupport(0.092) //0.092
-      .setNumPartitions(partitionNum)
-    val fpgrowth = fp.run(transactions)
-    fpgrowth.freqItemsets.persist(StorageLevel.MEMORY_AND_DISK_SER)
-    genFreSortBy(myConf.outputFilePath + "/Freq", fpgrowth)
-    sc.stop()
-  }
-}
+// 取出数据
+val data_D = sc.textFile(input_path + "/D.dat", numPartitions)
+val data_U = sc.textFile(input_path + "/U.dat", numPartitions)
+...
+// 查看所有的频繁项集，并且列出它出现的次数
+model.freqItemsets.persist(StorageLevel.MEMORY_AND_DISK_SER)
+model.freqItemsets.saveAsTextFile(output_path + "/Freq")
+...
+// 通过置信度筛选出推荐规则则
+model.generateAssociationRules(minConfidence).saveAsTextFile(output_path + "/Rules")
+...
+// 将列表转化为RDD对象并保存至文件
+sc.parallelize(recList).saveAsTextFile(output_path + "/Rec")
 ```
 
-FPNewDef类：一种用于挖掘频繁项集的并行 FP-growth 算法——PFP-Growth。
-
-```scala
-class FPNewDef private (
-    private var minSupport: Double,
-    private var numPartitions: Int
-) extends Serializable {  
-    ...
-    def run(data: RDD[Array[Int]]): FPModel = {
-        val count = data.count()
-        val minCount = math.ceil(minSupport * count).toLong
-        val numParts =
-          if (numPartitions > 0) numPartitions else data.partitions.length
-        val partitioner = new HashPartitioner(numParts)
-        val freqItems = genFreqItems(data, minCount, partitioner)
-        val freqItemsets = genFreqItemsets(data, minCount, freqItems, partitioner)
-        new FPModel(freqItemsets)
-    }
-}
-```
+算法实现部分如4.2节所示，不再赘述。
 
