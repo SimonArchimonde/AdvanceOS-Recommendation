@@ -25,7 +25,6 @@ openjdk 1.8.0_292
 ~~~shell
 |____src
 | |____main
-| | |____resources
 | | |____scala
 | | | |____AR
 | | | | |____Main.scala                 # main函数
