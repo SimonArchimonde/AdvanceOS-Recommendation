@@ -334,4 +334,3 @@ sc.parallelize(recList).saveAsTextFile(output_path + "/Rec")
 ```
 
 算法实现部分如4.2节所示，不再赘述。
-
